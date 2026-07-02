@@ -1,0 +1,104 @@
+@startuml domain_class
+' ============================================================
+' HRS 概念クラス図（演習1 / ドメイン分析）
+' Issue: [Domain] 概念クラス図を作成する
+'
+' 方針:
+'   - ここには「ホテル業務に存在する概念」だけを置く
+'   - Controller / UI / Repository / DB などの実装クラスは入れない
+'   - 多重度・ロール名・集約を明示する
+' プレビュー: VS Code の PlantUML 拡張（Alt+D）か
+'            https://www.plantuml.com/plantuml にコード貼り付け
+' ============================================================
+
+skinparam classAttributeIconSize 0
+hide circle
+
+class Customer {
+  customerId
+  name
+  phone
+  email
+}
+
+class Staff {
+  staffId
+  name
+}
+
+class Hotel {
+  hotelId
+  name
+}
+
+class Room {
+  roomNumber
+  status
+}
+
+class RoomType {
+  typeId
+  name
+  capacity
+  pricePerNight
+}
+
+class Reservation {
+  reservationId
+  checkInDate
+  checkOutDate
+  status
+  createdAt
+}
+
+class Stay {
+  stayId
+  actualCheckInAt
+  actualCheckOutAt
+}
+
+class Invoice {
+  invoiceId
+  totalAmount
+  issuedAt
+}
+
+class Payment {
+  paymentId
+  amount
+  method
+  paidAt
+}
+
+' --- 状態は列挙として表現（採用するか要判断: docs/01_domain_analysis.md 参照）---
+enum ReservationStatus {
+  RESERVED
+  CANCELLED
+  CHECKED_IN
+  CHECKED_OUT
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  OUT_OF_SERVICE
+}
+
+' ============================================================
+' 関係と多重度
+' ============================================================
+Hotel        "1"    o-- "*"    Room                  : owns
+RoomType     "1"    --  "*"    Room
+Customer     "1"    --  "*"    Reservation
+Reservation  "*"    --  "1"    RoomType
+Reservation  "0..1" --  "0..1" Room                  : assigned room
+Reservation  "1"    --  "0..1" Stay
+Stay         "1"    --  "0..1" Invoice
+Invoice      "1"    --  "0..1" Payment
+Staff        "*"    --  "*"    Stay                  : handles
+
+' 状態の対応（列挙を採用する場合のみ）
+Reservation  ..>  ReservationStatus
+Room         ..>  RoomStatus
+
+@enduml
