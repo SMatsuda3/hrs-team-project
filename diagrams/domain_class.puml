@@ -1,84 +1,82 @@
 @startuml domain_class
 ' ============================================================
-' HRS 概念クラス図（演習1 / ドメイン分析）
+' HRS 概念クラス図（演習1 / ドメイン分析）日本語版
 ' Issue: [Domain] 概念クラス図を作成する
 '
 ' 方針:
-'   - ここには「ホテル業務に存在する概念」だけを置く
-'   - Controller / UI / Repository / DB などの実装クラスは入れない
+'   - ホテル業務に存在する概念だけを置く（実装クラスは入れない）
+'   - 状態は「属性の型」として列挙を指す（点線の依存は描かない）
 '   - 多重度・ロール名・集約を明示する
-' プレビュー: VS Code の PlantUML 拡張（Alt+D）か
-'            https://www.plantuml.com/plantuml にコード貼り付け
 ' ============================================================
 
 skinparam classAttributeIconSize 0
 hide circle
 
-class Customer {
-  customerId
-  name
-  phone
-  email
+class 顧客 {
+  顧客ID
+  氏名
+  電話番号
+  メールアドレス
 }
 
-class Staff {
-  staffId
-  name
+class フロント係 {
+  係員ID
+  氏名
 }
 
-class Hotel {
-  hotelId
-  name
+class ホテル {
+  ホテルID
+  ホテル名
 }
 
-class Room {
-  roomNumber
-  status
+class 部屋 {
+  部屋番号
+  状態 : 部屋状態
 }
 
-class RoomType {
-  typeId
-  name
-  capacity
-  pricePerNight
+class 部屋種別 {
+  種別ID
+  種別名
+  定員
+  一泊料金
 }
 
-class Reservation {
-  reservationId
-  checkInDate
-  checkOutDate
-  status
-  createdAt
+class 予約 {
+  予約番号
+  チェックイン日
+  チェックアウト日
+  状態 : 予約状態
+  作成日時
 }
 
-class Stay {
-  stayId
-  actualCheckInAt
-  actualCheckOutAt
+class 宿泊 {
+  宿泊ID
+  実チェックイン日時
+  実チェックアウト日時
 }
 
-class Invoice {
-  invoiceId
-  totalAmount
-  issuedAt
+class 請求 {
+  請求番号
+  合計金額
+  発行日時
 }
 
-class Payment {
-  paymentId
-  amount
-  method
-  paidAt
+class 支払い {
+  支払番号
+  金額
+  支払方法
+  支払日時
 }
 
-' --- 状態は列挙として表現（採用するか要判断: docs/01_domain_analysis.md 参照）---
-enum ReservationStatus {
+' 状態が取りうる値の一覧（型の定義）。属性側から型として参照するため、点線は描かない
+enum 予約状態 {
   RESERVED
   CANCELLED
   CHECKED_IN
   CHECKED_OUT
 }
 
-enum RoomStatus {
+enum 部屋状態 {
   AVAILABLE
   OCCUPIED
   OUT_OF_SERVICE
@@ -87,18 +85,14 @@ enum RoomStatus {
 ' ============================================================
 ' 関係と多重度
 ' ============================================================
-Hotel        "1"    o-- "*"    Room                  : owns
-RoomType     "1"    --  "*"    Room
-Customer     "1"    --  "*"    Reservation
-Reservation  "*"    --  "1"    RoomType
-Reservation  "0..1" --  "0..1" Room                  : assigned room
-Reservation  "1"    --  "0..1" Stay
-Stay         "1"    --  "0..1" Invoice
-Invoice      "1"    --  "0..1" Payment
-Staff        "*"    --  "*"    Stay                  : handles
-
-' 状態の対応（列挙を採用する場合のみ）
-Reservation  ..>  ReservationStatus
-Room         ..>  RoomStatus
+ホテル      "1"    o-- "*"    部屋        : 所有
+部屋種別    "1"    --  "*"    部屋
+顧客        "1"    --  "*"    予約
+予約        "*"    --  "1"    部屋種別
+予約        "0..1" --  "0..1" 部屋        : 割当部屋
+予約        "1"    --  "0..1" 宿泊
+宿泊        "1"    --  "0..1" 請求
+請求        "1"    --  "0..1" 支払い
+フロント係  "*"    --  "*"    宿泊        : 担当
 
 @enduml
