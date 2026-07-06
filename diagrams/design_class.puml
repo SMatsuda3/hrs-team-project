@@ -24,7 +24,6 @@ class 部屋種別 {
   - 種別名 : String
   - 定員 : int
   - 一泊料金 : int
-  + 料金(泊数 : int) : int
   + 空室数(期間 : DateRange) : int
 }
 
@@ -45,6 +44,7 @@ class 予約 {
   + チェックインする(部屋 : 部屋)
   + チェックアウトする()
   + 泊数() : int
+  + 料金() : int
 }
 
 class 宿泊 {
