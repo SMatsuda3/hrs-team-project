@@ -1,0 +1,103 @@
+@startuml domain_class
+' ============================================================
+' HRS 概念クラス図（演習1 / ドメイン分析）日本語・型つき版
+' 設計クラス図に合わせて更新（フロントスタッフ／予約システム管理者を分離）
+'
+' 概念レベルなので、操作（メソッド）と誘導可能性（矢印）は描かない。
+' 状態は列挙を型として指す（点線の依存は描かない）。
+' ============================================================
+
+skinparam classAttributeIconSize 0
+hide circle
+
+class 顧客 {
+  顧客ID : String
+  氏名 : String
+  電話番号 : String
+  メールアドレス : String
+}
+
+class 予約システム管理者 {
+  管理者ID : String
+  氏名 : String
+}
+
+class フロントスタッフ {
+  スタッフID : String
+  氏名 : String
+}
+
+class ホテル {
+  ホテルID : String
+  ホテル名 : String
+  住所 : String
+}
+
+class 部屋種別 {
+  種別ID : String
+  種別名 : String
+  定員 : int
+  一泊料金 : int
+}
+
+class 部屋 {
+  部屋番号 : String
+  状態 : RoomStatus
+}
+
+class 予約 {
+  予約番号 : String
+  チェックイン日 : Date
+  チェックアウト日 : Date
+  人数 : int
+  状態 : ReservationStatus
+  予約日時 : DateTime
+}
+
+class 宿泊 {
+  宿泊ID : String
+  実チェックイン日時 : DateTime
+  実チェックアウト日時 : DateTime
+}
+
+class 請求 {
+  請求番号 : String
+  合計金額 : int
+  発行日時 : DateTime
+}
+
+class 支払い {
+  支払番号 : String
+  金額 : int
+  支払方法 : String
+  支払日時 : DateTime
+}
+
+enum ReservationStatus {
+  RESERVED
+  CANCELLED
+  CHECKED_IN
+  CHECKED_OUT
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  OUT_OF_SERVICE
+}
+
+' ============================================================
+' 関係と多重度（概念レベルなので向きは付けない）
+' ============================================================
+ホテル              "1"    o-- "*"    部屋
+部屋種別            "1"    --  "*"    部屋
+顧客                "1"    --  "*"    予約
+予約                "*"    --  "1"    部屋種別
+予約                "0..1" --  "0..1" 部屋
+予約                "1"    --  "0..1" 宿泊
+宿泊                "1"    --  "0..1" 請求
+請求                "1"    --  "0..1" 支払い
+予約システム管理者  "1"    --  "*"    ホテル
+フロントスタッフ    "*"    --  "*"    宿泊
+
+@enduml
