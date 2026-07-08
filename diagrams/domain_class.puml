@@ -10,8 +10,8 @@
 skinparam classAttributeIconSize 0
 hide circle
 
-class 顧客 {
-  顧客ID : String
+class 利用者 {
+  利用者ID : String
   氏名 : String
   電話番号 : String
   メールアドレス : String
@@ -91,7 +91,7 @@ enum RoomStatus {
 ' ============================================================
 ホテル              "1"    o-- "*"    部屋
 部屋種別            "1"    --  "*"    部屋
-顧客                "1"    --  "*"    予約
+利用者                "1"    --  "*"    予約
 予約                "*"    --  "1"    部屋種別
 予約                "0..1" --  "0..1" 部屋
 予約                "1"    --  "0..1" 宿泊
