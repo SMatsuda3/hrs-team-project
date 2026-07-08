@@ -1,8 +1,8 @@
 @startuml
 skinparam classAttributeIconSize 0
 
-class 顧客 {
-  - 顧客ID : String
+class 利用者 {
+  - 利用者ID : String
   - 氏名 : String
   - 電話番号 : String
   - メールアドレス : String
