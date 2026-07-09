@@ -45,7 +45,7 @@ class 予約 {
   人数 : int
   状態 : ReservationStatus
   予約日時 : DateTime
-  キャンセル日時：DateTime [0..1]
+  キャンセル日時 : DateTime [0..1]
 }
 
 class 宿泊 {
