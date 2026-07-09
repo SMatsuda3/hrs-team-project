@@ -1,1 +1,58 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Waseda Hotel Reservation System</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">HRS</span>
+        <div>
+          <strong>Waseda Hotel</strong>
+          <small>Reservation System</small>
+        </div>
+      </div>
+      <nav class="guest-nav" aria-label="顧客メニュー">
+        <button class="nav-link" data-view="home">空室検索</button>
+        <button class="nav-link" data-view="lookup">予約確認</button>
+      </nav>
+      <div class="topbar-actions">
+        <span id="rolePill" class="role-pill">Guest</span>
+        <button id="loginButton" class="button secondary">Staff/Admin Login</button>
+        <button id="logoutButton" class="button ghost hidden">Logout</button>
+      </div>
+    </header>
 
+    <main id="app"></main>
+
+    <div id="toast" class="toast hidden" role="status"></div>
+
+    <dialog id="loginDialog" class="dialog">
+      <form id="loginForm" method="dialog" class="dialog-card">
+        <div>
+          <p class="eyebrow">Restricted area</p>
+          <h2>スタッフ/管理者ログイン</h2>
+        </div>
+        <label>
+          User
+          <input id="loginUser" autocomplete="username" />
+        </label>
+        <label>
+          Password
+          <input id="loginPassword" type="password" autocomplete="current-password" />
+        </label>
+        <div class="dialog-actions">
+          <button type="button" class="button ghost" id="loginCancel">閉じる</button>
+          <button class="button primary" value="login">ログイン</button>
+        </div>
+        <p class="hint">Staff ID: staff, front001, front002, front003 / staff123<br />Admin ID: admin, admin001, manager001 / admin123</p>
+      </form>
+    </dialog>
+
+    <script src="./ui.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
