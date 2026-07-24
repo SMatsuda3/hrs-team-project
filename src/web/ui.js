@@ -169,7 +169,6 @@ function roomTypeCard(type) {
 
 function renderResults() {
   const root = page("空室検索結果", "");
-  root.appendChild(searchCard());
   const section = el("section", "section");
   const query = state.lastSearch || defaultSearch();
   let results = [];
@@ -208,7 +207,11 @@ function renderResults() {
     });
     section.appendChild(container);
   }
+  const actions = el("div", "actions results-actions");
+  actions.innerHTML = `<button class="button secondary" data-view-target="home">条件を変更する</button>`;
+  section.prepend(actions);
   root.appendChild(section);
+  root.querySelector("[data-view-target='home']").addEventListener("click", () => render("home"));
   root.querySelectorAll("[data-reserve]").forEach((button) => {
     button.addEventListener("click", () => {
       state.lastSearch.roomTypeId = button.dataset.reserve;

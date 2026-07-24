@@ -298,6 +298,8 @@ input[readonly] {
 
 .auth-panel {
   width: min(460px, 100%);
+  display: grid;
+  gap: 16px;
 }
 
 .auth-panel-wide {
@@ -317,6 +319,11 @@ input[readonly] {
 .text-link:hover {
   color: var(--brand-dark);
   text-decoration: underline;
+}
+
+.results-actions {
+  justify-content: flex-end;
+  margin-bottom: 14px;
 }
 
 .room-card,

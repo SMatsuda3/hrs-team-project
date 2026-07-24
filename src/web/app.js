@@ -473,6 +473,15 @@ function normalizeLoginId(value) {
 
 function authenticateOperator(userId, password, requiredRole) {
   const normalizedUserId = normalizeLoginId(userId);
+  if (requiredRole === "STAFF") {
+    const matched = normalizedUserId.match(/^h(\d{3})-front$/);
+    const hotelId = matched ? `H${matched[1]}` : "";
+    const hotelExists = state.hotels.some((hotel) => hotel.hotelId === hotelId);
+    if (hotelExists && password === `front-h${matched[1]}`) {
+      return { userId: normalizedUserId, password, role: "STAFF", hotelId };
+    }
+    return null;
+  }
   const account = OPERATOR_ACCOUNTS.find((operator) =>
     operator.userId === normalizedUserId && operator.password === password && operator.role === requiredRole);
   return account || null;
