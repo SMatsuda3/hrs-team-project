@@ -173,7 +173,7 @@ function renderResults() {
   const query = state.lastSearch || defaultSearch();
   let results = [];
   try {
-    results = searchAvailability(query);
+    results = sortAvailabilityResults(searchAvailability(query), state.resultSort || "priceAsc");
   } catch (error) {
     section.appendChild(empty(error.message));
     root.appendChild(section);
@@ -208,10 +208,26 @@ function renderResults() {
     section.appendChild(container);
   }
   const actions = el("div", "actions results-actions");
-  actions.innerHTML = `<button class="button secondary" data-view-target="home">条件を変更する</button>`;
+  actions.innerHTML = `
+    <label class="sort-control">並び替え
+      <select id="resultSort">
+        <option value="priceAsc" ${state.resultSort === "priceAsc" ? "selected" : ""}>料金が安い順</option>
+        <option value="priceDesc" ${state.resultSort === "priceDesc" ? "selected" : ""}>料金が高い順</option>
+        <option value="availabilityDesc" ${state.resultSort === "availabilityDesc" ? "selected" : ""}>空室が多い順</option>
+        <option value="capacityDesc" ${state.resultSort === "capacityDesc" ? "selected" : ""}>定員が多い順</option>
+        <option value="hotelNameAsc" ${state.resultSort === "hotelNameAsc" ? "selected" : ""}>ホテル名順</option>
+      </select>
+    </label>
+    <button class="button secondary" data-view-target="home">条件を変更する</button>
+  `;
   section.prepend(actions);
   root.appendChild(section);
   root.querySelector("[data-view-target='home']").addEventListener("click", () => render("home"));
+  root.querySelector("#resultSort").addEventListener("change", (event) => {
+    state.resultSort = event.currentTarget.value;
+    saveState();
+    render("results");
+  });
   root.querySelectorAll("[data-reserve]").forEach((button) => {
     button.addEventListener("click", () => {
       state.lastSearch.roomTypeId = button.dataset.reserve;
@@ -1096,6 +1112,18 @@ function optionList(options, selectedValue) {
 function hotelLocationText(hotelId) {
   const hotel = hotelById(hotelId);
   return [hotel.region, hotel.prefecture, hotel.city].filter(Boolean).join(" / ") || "所在地未設定";
+}
+
+function sortAvailabilityResults(results, sortKey) {
+  const sorted = [...results];
+  const sorters = {
+    priceAsc: (a, b) => a.estimatedAmount - b.estimatedAmount || a.hotelName.localeCompare(b.hotelName, "ja"),
+    priceDesc: (a, b) => b.estimatedAmount - a.estimatedAmount || a.hotelName.localeCompare(b.hotelName, "ja"),
+    availabilityDesc: (a, b) => b.availableRooms - a.availableRooms || a.estimatedAmount - b.estimatedAmount,
+    capacityDesc: (a, b) => b.capacity - a.capacity || a.estimatedAmount - b.estimatedAmount,
+    hotelNameAsc: (a, b) => a.hotelName.localeCompare(b.hotelName, "ja") || a.estimatedAmount - b.estimatedAmount
+  };
+  return sorted.sort(sorters[sortKey] || sorters.priceAsc);
 }
 
 function el(tag, className = "") {
