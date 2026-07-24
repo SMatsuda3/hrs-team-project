@@ -133,6 +133,7 @@ const seedState = {
   invoices: [],
   payments: [],
   lastSearch: null,
+  resultSort: "priceAsc",
   signedInHotelId: ""
 };
 
@@ -724,6 +725,7 @@ function loadState() {
 function normalizeState(rawState) {
   const normalized = { ...structuredClone(seedState), ...rawState };
   normalized.signedInHotelId = normalized.signedInHotelId || "";
+  normalized.resultSort = normalized.resultSort || "priceAsc";
   normalized.accounts = mergeSeedItems(seedState.accounts, normalized.accounts || [], "accountId").map((account) => ({
     accountId: account.accountId || idFromSeed("U"),
     customerId: account.customerId || idFromSeed("C"),
