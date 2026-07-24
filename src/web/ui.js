@@ -1,19 +1,32 @@
 // UI rendering layer. Business rules and data handling stay in app.js.
 
 function render(view = "home") {
+  if (portal === "staff" && state.role !== "STAFF" && view !== "staffLogin") {
+    view = "staffLogin";
+  }
+  if (portal === "admin" && state.role !== "ADMIN" && view !== "adminLogin") {
+    view = "adminLogin";
+  }
+  if (portal === "customer" && ["staff", "checkin", "checkout", "admin", "hotels", "hotelEdit", "staffLogin", "adminLogin"].includes(view)) {
+    view = "home";
+  }
   syncHeader(view);
-  if (state.role === "STAFF" && !["staff", "lookup", "checkin", "checkout"].includes(view)) {
+  if (portal === "staff" && state.role === "STAFF" && !["staff", "lookup", "checkin", "checkout"].includes(view)) {
     view = "staff";
   }
-  if (state.role === "ADMIN" && !["admin", "hotels", "hotelEdit", "lookup"].includes(view)) {
+  if (portal === "admin" && state.role === "ADMIN" && !["admin", "hotels", "hotelEdit", "lookup"].includes(view)) {
     view = "admin";
   }
   const views = {
     home: renderHome,
+    account: renderAccount,
+    register: renderRegister,
     results: renderResults,
     reserve: renderReserve,
     complete: renderComplete,
     lookup: renderLookup,
+    staffLogin: () => renderPortalLogin("STAFF"),
+    adminLogin: () => renderPortalLogin("ADMIN"),
     staff: renderStaff,
     checkin: renderCheckIn,
     checkout: renderCheckOut,
@@ -42,9 +55,30 @@ function renderHome() {
 
 function searchCard() {
   const search = state.lastSearch || defaultSearch();
+  const regions = locationOptions("region");
+  const prefectures = locationOptions("prefecture", { region: search.region });
+  const cities = locationOptions("city", { region: search.region, prefecture: search.prefecture });
   const card = el("section", "search-card");
   card.innerHTML = `
-    <form id="searchForm" class="search-grid">
+    <form id="searchForm" class="search-grid location-search-grid">
+      <label>地方
+        <select name="region">
+          <option value="">すべて</option>
+          ${optionList(regions, search.region)}
+        </select>
+      </label>
+      <label>都道府県
+        <select name="prefecture">
+          <option value="">すべて</option>
+          ${optionList(prefectures, search.prefecture)}
+        </select>
+      </label>
+      <label>市区町村
+        <select name="city">
+          <option value="">すべて</option>
+          ${optionList(cities, search.city)}
+        </select>
+      </label>
       <label>チェックイン<input name="checkInDate" type="date" value="${search.checkInDate}"></label>
       <label>チェックアウト<input name="checkOutDate" type="date" value="${search.checkOutDate}"></label>
       <label>人数<input name="guestCount" type="number" min="1" max="10" value="${search.guestCount}"></label>
@@ -57,11 +91,33 @@ function searchCard() {
       <button class="button primary">空室を検索</button>
     </form>
   `;
+  const formNode = card.querySelector("#searchForm");
+  const regionSelect = formNode.elements.region;
+  const prefectureSelect = formNode.elements.prefecture;
+  const citySelect = formNode.elements.city;
+  const refreshLocationSelects = () => {
+    const region = regionSelect.value;
+    const prefectureOptions = locationOptions("prefecture", { region });
+    if (!prefectureOptions.includes(prefectureSelect.value)) {
+      prefectureSelect.value = "";
+    }
+    prefectureSelect.innerHTML = `<option value="">すべて</option>${optionList(prefectureOptions, prefectureSelect.value)}`;
+    const cityOptions = locationOptions("city", { region, prefecture: prefectureSelect.value });
+    if (!cityOptions.includes(citySelect.value)) {
+      citySelect.value = "";
+    }
+    citySelect.innerHTML = `<option value="">すべて</option>${optionList(cityOptions, citySelect.value)}`;
+  };
+  regionSelect.addEventListener("change", refreshLocationSelects);
+  prefectureSelect.addEventListener("change", refreshLocationSelects);
   card.querySelector("#searchForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const query = {
       hotelId: "",
+      region: form.get("region"),
+      prefecture: form.get("prefecture"),
+      city: form.get("city"),
       checkInDate: form.get("checkInDate"),
       checkOutDate: form.get("checkOutDate"),
       guestCount: Number(form.get("guestCount")),
@@ -136,6 +192,7 @@ function renderResults() {
           <h3>${result.roomTypeName}</h3>
           <strong>${result.hotelName}</strong>
           <div class="result-meta">
+            <span class="chip">${hotelLocationText(result.hotelId)}</span>
             <span class="chip">${result.nights}泊</span>
             <span class="chip">${result.guestCount}名</span>
             <span class="chip">空室 ${result.availableRooms}室</span>
@@ -173,6 +230,40 @@ function renderReserve() {
     return root;
   }
   const nights = nightsBetween(query.checkInDate, query.checkOutDate);
+  if (state.role !== "USER") {
+    const root = page("予約情報の入力", "");
+    const layout = el("section", "section");
+    layout.innerHTML = `
+      <div class="admin-grid">
+        <aside class="summary-card">
+          <p class="eyebrow">Your stay</p>
+          <h2>${type.name}</h2>
+          <div class="summary-list">
+            <div><span>ホテル</span><strong>${hotelById(query.hotelId).name}</strong></div>
+            <div><span>チェックイン</span><strong>${query.checkInDate}</strong></div>
+            <div><span>チェックアウト</span><strong>${query.checkOutDate}</strong></div>
+            <div><span>人数</span><strong>${query.guestCount}名</strong></div>
+            <div><span>宿泊数</span><strong>${nights}泊</strong></div>
+            <div><span>料金目安</span><strong>${yen(type.pricePerNight * nights)}</strong></div>
+          </div>
+        </aside>
+        <div class="panel" style="grid-column: span 2;">
+          <h2>ログインが必要です</h2>
+          <p class="muted">予約内容をアカウントに紐づけるため、ログインまたは新規登録を行ってください。</p>
+          <div class="actions" style="margin-top:16px;">
+            <button class="button primary" data-view-target="account">ログイン・新規登録へ</button>
+            <button class="button ghost" data-view-target="results">検索結果に戻る</button>
+          </div>
+        </div>
+      </div>
+    `;
+    root.appendChild(layout);
+    root.querySelectorAll("[data-view-target]").forEach((button) => {
+      button.addEventListener("click", () => render(button.dataset.viewTarget));
+    });
+    return root;
+  }
+  const account = currentUserAccount();
   const root = page("予約情報の入力", "");
   const layout = el("section", "section");
   layout.innerHTML = `
@@ -190,11 +281,11 @@ function renderReserve() {
         </div>
       </aside>
       <form id="reserveForm" class="panel" style="grid-column: span 2;">
-        <h2>代表者情報</h2>
-        <div class="form-grid">
-          <label>氏名<input name="name" required placeholder="山田 太郎"></label>
-          <label>メールアドレス<input name="email" required type="email" placeholder="taro@example.com"></label>
-          <label>電話番号<input name="phone" required placeholder="090-0000-0000"></label>
+        <h2>予約者情報</h2>
+        <div class="summary-list">
+          <div><span>氏名</span><strong>${escapeHtml(account.name)}</strong></div>
+          <div><span>メール</span><strong>${escapeHtml(account.email)}</strong></div>
+          <div><span>電話番号</span><strong>${escapeHtml(account.phone)}</strong></div>
         </div>
         <div class="actions" style="margin-top:16px;">
           <button type="button" class="button secondary" data-view="results">条件に戻る</button>
@@ -208,7 +299,7 @@ function renderReserve() {
   root.querySelector("#reserveForm").addEventListener("submit", (event) => {
     event.preventDefault();
     try {
-      const reservation = reserveRoom(Object.fromEntries(new FormData(event.currentTarget)));
+      const reservation = reserveRoom();
       state.lastReservationId = reservation.reservationId;
       saveState();
       render("complete");
@@ -255,13 +346,219 @@ function renderComplete() {
 }
 
 function renderLookup() {
+  if (portal === "customer") {
+    return renderCustomerReservations();
+  }
+  const root = portal === "staff"
+    ? workspacePage("予約確認", "", staffMenu())
+    : workspacePage("予約確認", "", adminMenu());
+  root.querySelector(".workspace-main").appendChild(lookupPanel(true));
+  return root;
+}
+
+function renderAccount() {
+  const root = el("div");
+  const section = el("section", "section");
+  const account = currentUserAccount();
+  if (account) {
+    section.innerHTML = `
+      <div class="admin-grid">
+        <article class="summary-card" style="grid-column: span 3;">
+          <p class="eyebrow">Signed in</p>
+          <h2>${escapeHtml(account.name)}</h2>
+          <div class="summary-list">
+            <div><span>メール</span><strong>${escapeHtml(account.email)}</strong></div>
+            <div><span>電話番号</span><strong>${escapeHtml(account.phone)}</strong></div>
+            <div><span>アカウントID</span><strong>${account.accountId}</strong></div>
+          </div>
+          <div class="actions" style="margin-top:16px;">
+            <button class="button primary" data-view-target="lookup">予約確認へ</button>
+            <button class="button ghost" data-view-target="home">空室検索へ</button>
+          </div>
+        </article>
+      </div>
+    `;
+    root.appendChild(section);
+    root.querySelectorAll("[data-view-target]").forEach((button) => {
+      button.addEventListener("click", () => render(button.dataset.viewTarget));
+    });
+    return root;
+  }
+  section.innerHTML = `
+    <div class="auth-section">
+      <form id="userLoginForm" class="panel auth-panel">
+        <p class="eyebrow">Login</p>
+        <h2>ログイン</h2>
+        <label>メールアドレス<input name="email" type="email" autocomplete="email" required placeholder="taro@example.com"></label>
+        <label>パスワード<input name="password" type="password" autocomplete="current-password" required placeholder="user123"></label>
+        <button class="button primary">ログイン</button>
+        <button type="button" class="text-link" data-view-target="register">アカウントを新しく登録する</button>
+      </form>
+    </div>
+  `;
+  root.appendChild(section);
+  section.querySelector("[data-view-target='register']").addEventListener("click", () => render("register"));
+  section.querySelector("#userLoginForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    try {
+      const form = new FormData(event.currentTarget);
+      const account = loginUserAccount(form.get("email"), form.get("password"));
+      if (!account) {
+        throw new Error("メールアドレスまたはパスワードが違います。");
+      }
+      signIn("USER", account.accountId);
+      toast("ログインしました。");
+      render("lookup");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  return root;
+}
+
+function renderRegister() {
+  const root = el("div");
+  const section = el("section", "section");
+  section.innerHTML = `
+    <div class="auth-section">
+      <form id="userRegisterForm" class="panel auth-panel auth-panel-wide">
+        <p class="eyebrow">Create account</p>
+        <h2>新規登録</h2>
+        <div class="form-grid">
+          <label>氏名<input name="name" autocomplete="name" required placeholder="山田 太郎"></label>
+          <label>メールアドレス<input name="email" type="email" autocomplete="email" required placeholder="taro@example.com"></label>
+          <label>電話番号<input name="phone" autocomplete="tel" required placeholder="090-0000-0000"></label>
+          <label>パスワード<input name="password" type="password" autocomplete="new-password" required></label>
+          <label>確認用パスワード<input name="passwordConfirm" type="password" autocomplete="new-password" required></label>
+        </div>
+        <div class="actions" style="margin-top:16px;">
+          <button class="button primary">登録してログイン</button>
+          <button type="button" class="button ghost" data-view-target="account">ログインに戻る</button>
+        </div>
+      </form>
+    </div>
+  `;
+  root.appendChild(section);
+  section.querySelector("[data-view-target='account']").addEventListener("click", () => render("account"));
+  section.querySelector("#userRegisterForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    try {
+      const account = registerUserAccount(Object.fromEntries(new FormData(event.currentTarget)));
+      signIn("USER", account.accountId);
+      toast("アカウントを作成しました。");
+      render("home");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  return root;
+}
+
+function renderPortalLogin(requiredRole) {
+  const isAdmin = requiredRole === "ADMIN";
+  const root = el("div");
+  const section = el("section", "section auth-section");
+  section.innerHTML = `
+    <form id="operatorLoginForm" class="panel auth-panel">
+      <p class="eyebrow">${isAdmin ? "Admin" : "Staff"}</p>
+      <h2>${isAdmin ? "管理者ログイン" : "スタッフログイン"}</h2>
+      <label>ID<input name="userId" required autocomplete="username" placeholder="${isAdmin ? "admin" : "h001-front"}"></label>
+      <label>パスワード<input name="password" type="password" required autocomplete="current-password"></label>
+      <button class="button primary">ログイン</button>
+      <p class="hint">${isAdmin ? "Admin ID: admin, admin001, manager001 / admin123" : "Staff ID: h001-front / front-h001 など、ホテルごとのフロントIDを使用"}</p>
+    </form>
+  `;
+  root.appendChild(section);
+  section.querySelector("#operatorLoginForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    try {
+      const form = new FormData(event.currentTarget);
+      const operator = authenticateOperator(form.get("userId"), form.get("password"), requiredRole);
+      if (!operator) {
+        throw new Error("ログイン情報が違います。");
+      }
+      signIn(operator.role, operator.userId, operator.hotelId);
+      toast(isAdmin ? "管理者としてログインしました。" : "スタッフとしてログインしました。");
+      render(isAdmin ? "admin" : "staff");
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  return root;
+}
+
+function staffMenu() {
+  return [
+    ["予約確認", "lookup"],
+    ["チェックイン", "checkin"],
+    ["チェックアウト", "checkout"]
+  ];
+}
+
+function adminMenu() {
+  return [
+    ["ホテル一覧", "hotels"],
+    ["予約確認", "lookup"]
+  ];
+}
+
+function renderCustomerReservations() {
   const root = page("予約確認", "");
-  root.appendChild(lookupPanel(true));
+  const section = el("section", "section");
+  if (state.role !== "USER") {
+    section.innerHTML = `
+      <div class="panel">
+        <h2>ログインが必要です</h2>
+        <p class="muted">予約一覧はアカウントごとに表示します。</p>
+        <div class="actions" style="margin-top:16px;">
+          <button class="button primary" data-view-target="account">ログイン・新規登録へ</button>
+          <button class="button ghost" data-view-target="home">空室検索へ</button>
+        </div>
+      </div>
+    `;
+    root.appendChild(section);
+    root.querySelectorAll("[data-view-target]").forEach((button) => {
+      button.addEventListener("click", () => render(button.dataset.viewTarget));
+    });
+    return root;
+  }
+  let details = [];
+  try {
+    details = reservationDetailsForSignedInUser();
+  } catch (error) {
+    section.appendChild(empty(error.message));
+    root.appendChild(section);
+    return root;
+  }
+  if (!details.length) {
+    section.appendChild(empty("このアカウントの予約はまだありません。"));
+  } else {
+    section.innerHTML = `
+      <div class="results">
+        ${details.map((detail) => reservationCard(detail, true)).join("")}
+      </div>
+    `;
+  }
+  root.appendChild(section);
+  root.querySelectorAll("[data-cancel]").forEach((cancelButton) => {
+    cancelButton.addEventListener("click", () => {
+      try {
+        cancelReservation(cancelButton.dataset.cancel);
+        saveState();
+        toast("予約をキャンセルしました。");
+        render("lookup");
+      } catch (error) {
+        toast(error.message);
+      }
+    });
+  });
   return root;
 }
 
 function lookupPanel(allowCancel) {
   const section = el("section", "section");
+  const backTarget = portal === "staff" ? "staff" : portal === "admin" ? "admin" : "home";
+  const backLabel = portal === "customer" ? "空室検索に戻る" : "トップに戻る";
   section.innerHTML = `
     <form class="panel" id="lookupForm">
       <div class="form-grid">
@@ -269,14 +566,14 @@ function lookupPanel(allowCancel) {
       </div>
       <div class="actions" style="margin-top:16px;">
         <button class="button primary">予約一覧を表示</button>
-        <button type="button" class="button ghost" data-view-target="home">空室検索に戻る</button>
+        <button type="button" class="button ghost" data-view-target="${backTarget}">${backLabel}</button>
       </div>
     </form>
     <div id="lookupResult"></div>
   `;
-  section.querySelector("[data-view-target='home']").addEventListener("click", () => render("home"));
+  section.querySelector("[data-view-target]").addEventListener("click", (event) => render(event.currentTarget.dataset.viewTarget));
   const refreshResults = (keyword) => {
-    const details = reservationDetailsList(keyword);
+    const details = portal === "staff" ? staffReservationDetailsList(keyword) : reservationDetailsList(keyword);
     section.querySelector("#lookupResult").innerHTML = `
       <section class="section">
         <div class="section-header"><div><h2>予約一覧</h2></div></div>
@@ -360,27 +657,21 @@ function checkInCompleteCard(detail) {
 }
 
 function renderStaff() {
-  const root = workspacePage("フロント業務", "", [
-    ["予約確認", "lookup"],
-    ["チェックイン", "checkin"],
-    ["チェックアウト", "checkout"]
-  ]);
+  const hotel = currentStaffHotel();
+  const reservations = staffReservations();
+  const root = workspacePage("フロント業務", "", staffMenu());
   const grid = el("section", "dashboard-grid");
   grid.innerHTML = `
-    ${metric("予約中", state.reservations.filter((r) => r.status === "RESERVED").length)}
-    ${metric("滞在中", state.reservations.filter((r) => r.status === "CHECKED_IN").length)}
-    ${metric("本日処理", state.payments.length)}
+    ${metric("担当ホテル", hotel?.name || "-")}
+    ${metric("予約中", reservations.filter((r) => r.status === "RESERVED").length)}
+    ${metric("滞在中", reservations.filter((r) => r.status === "CHECKED_IN").length)}
   `;
   root.querySelector(".workspace-main").appendChild(grid);
   return root;
 }
 
 function renderCheckIn() {
-  const root = workspacePage("チェックイン", "", [
-    ["予約確認", "lookup"],
-    ["チェックイン", "checkin"],
-    ["チェックアウト", "checkout"]
-  ]);
+  const root = workspacePage("チェックイン", "", staffMenu());
   const panel = el("section", "panel");
   panel.innerHTML = `
     <div class="stepper">
@@ -405,6 +696,7 @@ function renderCheckIn() {
       const form = new FormData(event.currentTarget);
       const reservationId = normalizeReservationInput(form.get("reservationId"));
       const detail = reservationDetails(reservationId);
+      assertStaffCanAccessReservation(detail.reservation);
       assertReservationTransition(detail.reservation, "checkIn");
       panel.querySelector("#checkInResult").innerHTML = checkInConfirmCard(detail);
       panel.querySelector("#checkInForm").addEventListener("submit", (checkInEvent) => {
@@ -427,11 +719,7 @@ function renderCheckIn() {
 }
 
 function renderCheckOut() {
-  const root = workspacePage("チェックアウト", "", [
-    ["予約確認", "lookup"],
-    ["チェックイン", "checkin"],
-    ["チェックアウト", "checkout"]
-  ]);
+  const root = workspacePage("チェックアウト", "", staffMenu());
   const panel = el("section", "panel");
   panel.innerHTML = `
     <form id="checkOutForm">
@@ -492,10 +780,7 @@ function renderCheckOut() {
 }
 
 function renderAdmin() {
-  const root = workspacePage("管理者画面", "", [
-    ["ホテル一覧", "hotels"],
-    ["予約確認", "lookup"]
-  ]);
+  const root = workspacePage("管理者画面", "", adminMenu());
   const grid = el("section", "dashboard-grid");
   grid.innerHTML = `
     ${metric("ホテル", state.hotels.length)}
@@ -508,10 +793,7 @@ function renderAdmin() {
 }
 
 function renderHotelAdmin() {
-  const root = workspacePage("ホテル一覧", "", [
-    ["ホテル一覧", "hotels"],
-    ["予約確認", "lookup"]
-  ]);
+  const root = workspacePage("ホテル一覧", "", adminMenu());
   const panel = el("section", "panel");
   panel.innerHTML = `
     <div class="section-header">
@@ -555,6 +837,9 @@ function renderHotelEdit() {
   const hotel = state.hotels.find((item) => item.hotelId === state.editingHotelId) || {
     hotelId: nextHotelId(),
     name: "",
+    region: "",
+    prefecture: "",
+    city: "",
     address: "",
     description: ""
   };
@@ -571,6 +856,9 @@ function renderHotelEdit() {
       <div class="internal-note">内部ホテルID: <strong>${hotel.hotelId}</strong></div>
       <div class="form-grid">
         <label>ホテル名<input name="name" value="${escapeHtml(hotel.name)}" required></label>
+        <label>地方<input name="region" value="${escapeHtml(hotel.region || "")}" required placeholder="関東"></label>
+        <label>都道府県<input name="prefecture" value="${escapeHtml(hotel.prefecture || "")}" required placeholder="東京都"></label>
+        <label>市区町村<input name="city" value="${escapeHtml(hotel.city || "")}" required placeholder="新宿区"></label>
         <label>住所<input name="address" value="${escapeHtml(hotel.address || "")}" required></label>
         <label>説明<textarea name="description" rows="3">${escapeHtml(hotel.description || "")}</textarea></label>
       </div>
@@ -659,11 +947,14 @@ function renderHotelEdit() {
     const savedHotel = {
       hotelId,
       name: form.get("name").trim(),
+      region: form.get("region").trim(),
+      prefecture: form.get("prefecture").trim(),
+      city: form.get("city").trim(),
       address: form.get("address").trim(),
       description: form.get("description").trim()
     };
-    if (!savedHotel.address) {
-      toast("住所を入力してください。");
+    if (!savedHotel.region || !savedHotel.prefecture || !savedHotel.city || !savedHotel.address) {
+      toast("地域、都道府県、市区町村、住所を入力してください。");
       return;
     }
     state.hotels = state.hotels.filter((item) => item.hotelId !== previousHotelId && item.hotelId !== hotelId);
@@ -760,10 +1051,22 @@ function empty(message) {
 }
 
 function syncHeader(view) {
-  rolePill.textContent = state.role === "GUEST" ? "Guest" : `${state.role} ${state.signedInUserId || ""}`.trim();
-  loginButton.classList.toggle("hidden", state.role !== "GUEST");
-  logoutButton.classList.toggle("hidden", state.role === "GUEST");
-  document.querySelector(".guest-nav").classList.toggle("hidden", state.role !== "GUEST");
+  const guestNav = document.querySelector(".guest-nav");
+  rolePill.classList.add("hidden");
+  if (portal === "customer") {
+    const account = currentUserAccount();
+    loginButton.textContent = "ログイン";
+    loginButton.classList.toggle("hidden", Boolean(account));
+    logoutButton.classList.toggle("hidden", !account);
+    guestNav?.classList.remove("hidden");
+  } else {
+    const requiredRole = portal === "admin" ? "ADMIN" : "STAFF";
+    const signedIn = state.role === requiredRole;
+    loginButton.textContent = portal === "admin" ? "管理者ログイン" : "スタッフログイン";
+    loginButton.classList.add("hidden");
+    logoutButton.classList.toggle("hidden", !signedIn);
+    guestNav?.classList.add("hidden");
+  }
   document.querySelectorAll(".nav-link").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === view);
   });
@@ -779,6 +1082,17 @@ function escapeHtml(value) {
 
 function yen(amount) {
   return `${Number(amount).toLocaleString("ja-JP")}円`;
+}
+
+function optionList(options, selectedValue) {
+  return options
+    .map((value) => `<option value="${escapeHtml(value)}" ${value === selectedValue ? "selected" : ""}>${escapeHtml(value)}</option>`)
+    .join("");
+}
+
+function hotelLocationText(hotelId) {
+  const hotel = hotelById(hotelId);
+  return [hotel.region, hotel.prefecture, hotel.city].filter(Boolean).join(" / ") || "所在地未設定";
 }
 
 function el(tag, className = "") {

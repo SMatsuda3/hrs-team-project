@@ -6,7 +6,7 @@
     <title>Waseda Hotel Reservation System</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body data-portal="customer">
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark">HRS</span>
@@ -20,37 +20,15 @@
         <button class="nav-link" data-view="lookup">予約確認</button>
       </nav>
       <div class="topbar-actions">
-        <span id="rolePill" class="role-pill">Guest</span>
-        <button id="loginButton" class="button secondary">Staff/Admin Login</button>
-        <button id="logoutButton" class="button ghost hidden">Logout</button>
+        <span id="rolePill" class="role-pill hidden"></span>
+        <button id="loginButton" class="button secondary">ログイン</button>
+        <button id="logoutButton" class="button ghost hidden">ログアウト</button>
       </div>
     </header>
 
     <main id="app"></main>
 
     <div id="toast" class="toast hidden" role="status"></div>
-
-    <dialog id="loginDialog" class="dialog">
-      <form id="loginForm" method="dialog" class="dialog-card">
-        <div>
-          <p class="eyebrow">Restricted area</p>
-          <h2>スタッフ/管理者ログイン</h2>
-        </div>
-        <label>
-          User
-          <input id="loginUser" autocomplete="username" />
-        </label>
-        <label>
-          Password
-          <input id="loginPassword" type="password" autocomplete="current-password" />
-        </label>
-        <div class="dialog-actions">
-          <button type="button" class="button ghost" id="loginCancel">閉じる</button>
-          <button class="button primary" value="login">ログイン</button>
-        </div>
-        <p class="hint">Staff ID: staff, front001, front002, front003 / staff123<br />Admin ID: admin, admin001, manager001 / admin123</p>
-      </form>
-    </dialog>
 
     <script src="./ui.js"></script>
     <script src="./app.js"></script>
