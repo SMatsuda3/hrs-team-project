@@ -46,6 +46,10 @@ textarea {
   backdrop-filter: blur(10px);
 }
 
+.portal-topbar {
+  grid-template-columns: 260px 1fr auto;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -214,6 +218,10 @@ textarea {
   align-items: end;
 }
 
+.location-search-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -271,10 +279,44 @@ input[readonly] {
 
 .room-grid,
 .dashboard-grid,
-.admin-grid {
+.admin-grid,
+.auth-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.auth-grid {
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.35fr);
+  align-items: start;
+}
+
+.auth-section {
+  display: grid;
+  place-items: start center;
+}
+
+.auth-panel {
+  width: min(460px, 100%);
+}
+
+.auth-panel-wide {
+  width: min(720px, 100%);
+}
+
+.text-link {
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  padding: 6px 0 0;
+  text-align: left;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.text-link:hover {
+  color: var(--brand-dark);
+  text-decoration: underline;
 }
 
 .room-card,
@@ -586,9 +628,11 @@ th {
   }
 
   .search-grid,
+  .location-search-grid,
   .room-grid,
   .dashboard-grid,
-  .admin-grid {
+  .admin-grid,
+  .auth-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
