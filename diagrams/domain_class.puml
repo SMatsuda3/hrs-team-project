@@ -24,6 +24,7 @@ class ホテル {
   ホテルID : String
   ホテル名 : String
   住所 : String
+  説明 : String
 }
 
 class 部屋種別 {
@@ -34,6 +35,7 @@ class 部屋種別 {
 }
 
 class 部屋 {
+  部屋ID : String
   部屋番号 : String
   状態 : RoomStatus
 }
