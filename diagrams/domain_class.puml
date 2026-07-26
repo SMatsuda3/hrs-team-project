@@ -6,18 +6,18 @@ hide circle
 class 利用者 {
   利用者ID : String
   氏名 : String
-  電話番号 : String
   メールアドレス : String
+  パスワード : String
 }
 
 class 予約システム管理者 {
   管理者ID : String
-  氏名 : String
+  パスワード : String
 }
 
 class フロントスタッフ {
   スタッフID : String
-  氏名 : String
+  パスワード : String
 }
 
 class ホテル {
@@ -69,7 +69,7 @@ class 支払い {
 
 enum ReservationStatus {
   RESERVED
-  CANCELLED
+  ' CANCELLED
   CHECKED_IN
   CHECKED_OUT
 }

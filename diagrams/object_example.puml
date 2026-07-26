@@ -10,16 +10,17 @@
 '   - チェックアウト済みなので部屋301は AVAILABLE に戻っている
 ' ============================================================
 
-object "sato : 顧客" as sato {
-  顧客ID = "C001"
+object "sato : 利用者" as sato {
+  利用者ID = "C001"
   氏名 = "佐藤一郎"
-  電話番号 = "090-1234-5678"
   メールアドレス = "sato@example.com"
+  パスワード = "abc1234"
 }
 
 object "hotel : ホテル" as hotel {
   ホテルID = "H01"
   ホテル名 = "Waseda Hotel"
+  住所 = "東京都新宿区大久保3丁目4-4-1"
 }
 
 object "single : 部屋種別" as single {
@@ -67,11 +68,15 @@ object "payment001 : 支払い" as payment001 {
   支払日時 = 2026-07-11 10:05
 }
 
-object "tanaka : フロントスタッフ" as tanaka {
+object "staff123 : フロントスタッフ" as staff123 {
   スタッフID = "ST-01"
-  氏名 = "田中花子"
+  パスワード = "staff123"
 }
 
+object "admin123 : 予約システム管理者" as admin123 {
+  管理者ID = "AD-01"
+  パスワード = "admin123"
+ }
 ' ============================================================
 ' リンク（クラス図の各関連に対応）
 ' ============================================================
@@ -85,6 +90,7 @@ reservation001 -- room301        : 割当
 reservation001 -- stay001        : 発生
 stay001        -- invoice001     : 生成
 invoice001     -- payment001     : 対応
-tanaka         -- stay001        : 担当
+staff123         -- stay001        : 担当
+admin123       -- hotel          : 管理
 
 @enduml
