@@ -1,0 +1,57 @@
+@startuml usecase
+left to right direction
+
+' ============================================================
+' HRS ユースケース図（実装 src/web の機能に整合させた版）
+' 旧 usecase.puml は空ファイルだったため新規作成
+' アクター名は「予約システム管理者」「フロントスタッフ」で統一
+' ============================================================
+
+actor 利用者
+actor フロントスタッフ
+actor 予約システム管理者
+
+rectangle "ホテル予約システム (HRS)" {
+  usecase "空室を検索する" as UC1
+  usecase "部屋を予約する" as UC2
+  usecase "予約を確認する" as UC3
+  usecase "予約をキャンセルする" as UC4
+  usecase "アカウントを登録する" as UC5
+  usecase "ログインする" as UC6
+  usecase "チェックインする" as UC7
+  usecase "チェックアウトする" as UC8
+  usecase "追加料金を登録する" as UC9
+  usecase "担当ホテルの予約を確認する" as UC10
+  usecase "ホテル情報を管理する" as UC11
+}
+
+利用者 --> UC1
+利用者 --> UC2
+利用者 --> UC3
+利用者 --> UC4
+利用者 --> UC5
+利用者 --> UC6
+
+フロントスタッフ --> UC7
+フロントスタッフ --> UC8
+フロントスタッフ --> UC10
+
+予約システム管理者 --> UC11
+
+' 予約とキャンセルはログイン必須（実装 requireCustomerAccount() 準拠）
+UC2 ..> UC6 : <<include>>
+' チェックアウト時に追加料金を任意で登録できる
+UC8 <.. UC9 : <<extend>>
+
+note bottom of UC11
+  ホテルの追加・編集に加えて
+  部屋種別・部屋の登録も
+  この画面で行う（実装準拠）
+end note
+
+note bottom of UC8
+  実装では請求作成と支払い記録が
+  チェックアウトに含まれる
+end note
+
+@enduml

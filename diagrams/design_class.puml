@@ -1,5 +1,11 @@
-@startuml
+@startuml design_class
 skinparam classAttributeIconSize 0
+
+' ============================================================
+' HRS 設計クラス図（実装 src/web/app.js に整合させた版）
+' 変更点の一覧は diagram_changes.md を参照
+' 旧版の「顧客」表記は「利用者」に統一（クラス定義と関連で不一致だったため）
+' ============================================================
 
 class 利用者 {
   - 利用者ID : String
@@ -8,22 +14,31 @@ class 利用者 {
   - メールアドレス : String
 }
 
+class アカウント {
+  - アカウントID : String
+  - メールアドレス : String
+  - パスワード : String
+  - 登録日時 : DateTime
+  + ログインする(メールアドレス : String, パスワード : String) : boolean
+}
+
 class 予約システム管理者 {
   - 管理者ID : String
-  - 氏名 : String
-
   + ホテル情報を管理する()
 }
 
 class フロントスタッフ {
   - スタッフID : String
-  - 氏名 : String
 }
 
 class ホテル {
   - ホテルID : String
   - ホテル名 : String
+  - 地方 : String
+  - 都道府県 : String
+  - 市区町村 : String
   - 住所 : String
+  - 説明 : String
 }
 
 class 部屋種別 {
@@ -35,6 +50,7 @@ class 部屋種別 {
 }
 
 class 部屋 {
+  - 部屋ID : String
   - 部屋番号 : String
   - 状態 : RoomStatus
   + 利用可能か() : boolean
@@ -46,28 +62,41 @@ class 予約 {
   - チェックアウト日 : Date
   - 人数 : int
   - 状態 : ReservationStatus
+  - 基本料金 : int
+  - 支払済 : boolean
   - 予約日時 : DateTime
+  - キャンセル日時 : DateTime [0..1]
+  - チェックイン日時 : DateTime [0..1]
+  - チェックアウト日時 : DateTime [0..1]
   + キャンセルする()
-  + チェックインする(部屋 : 部屋)
+  + チェックインする()
   + チェックアウトする()
   + 泊数() : int
-  + 料金() : int
 }
 
 class 宿泊 {
   - 宿泊ID : String
   - 実チェックイン日時 : DateTime
-  - 実チェックアウト日時 : DateTime
+  - 実チェックアウト日時 : DateTime [0..1]
+}
+
+class 追加料金 {
+  - 追加料金ID : String
+  - 名目 : String
+  - 金額 : int
 }
 
 class 請求 {
   - 請求番号 : String
+  - 基本料金 : int
+  - 追加料金合計 : int
   - 合計金額 : int
   - 発行日時 : DateTime
 }
 
 class 支払い {
   - 支払番号 : String
+  - 支払種別 : String
   - 金額 : int
   - 支払方法 : String
   - 支払日時 : DateTime
@@ -86,14 +115,38 @@ enum RoomStatus {
   OUT_OF_SERVICE
 }
 
-ホテル      "1"    o-- "*"    部屋        
+' ============================================================
+' 関連（設計レベルなので参照方向を付ける）
+' ============================================================
+利用者      "1"    --> "1"    アカウント
+ホテル      "1"    o-- "*"    部屋
+ホテル      "1"    o-- "*"    部屋種別
 部屋種別    "1"    --  "*"    部屋
-顧客        "1"    --> "*"    予約
-予約        "*"    --> "1"    部屋種別    
+利用者      "1"    --> "*"    予約
+予約        "*"    --> "1"    ホテル
+予約        "*"    --> "1"    部屋種別
 予約        "*"    --> "0..1" 部屋
-予約        "1"    --> "0..1" 宿泊       
-宿泊        "1"    --> "0..1" 請求        
-請求        "1"    --> "0..1" 支払い     
-予約システム管理者 "1" --> "*" ホテル
-フロントスタッフ "*" --> "*" 宿泊
+予約        "1"    --> "0..1" 宿泊
+予約        "1"    --> "*"    追加料金
+予約        "1"    --> "0..1" 請求
+予約        "1"    --> "0..1" 支払い
+宿泊        "*"    --> "1"    部屋
+予約システム管理者 "*" --> "*" ホテル
+フロントスタッフ   "1" --> "1" ホテル
+
+note right of 予約
+  チェックインする() は
+  システムが AVAILABLE な部屋を
+  自動選択して割り当てる
+  （実装 checkIn() 準拠。引数なし）
+end note
+
+note right of 部屋種別
+  空室数(期間) =
+    OUT_OF_SERVICE を除く部屋数
+    − 期間が重なる RESERVED /
+      CHECKED_IN の予約数
+  （実装 availableRoomCount() 準拠）
+end note
+
 @enduml

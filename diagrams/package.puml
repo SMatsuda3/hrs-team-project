@@ -1,0 +1,42 @@
+@startuml package
+
+' ============================================================
+' HRS パッケージ図（実装 src/web の層構造に整合させた版）
+' 旧 package.puml は空ファイルだったため新規作成
+' 実装は app.js 1ファイルに複数層が同居しているため、
+' 「論理的な層」をパッケージとして表す（HRS_APPLICATION_GUIDE 12章準拠）
+' ============================================================
+
+package "UI層" as UI {
+  [index.html]
+  [admin/index.html]
+  [staff/index.html]
+  [ui.js]
+}
+
+package "アプリケーション層" as App {
+  [ユースケース関数\n(searchAvailability, reserveRoom,\ncancelReservation, checkIn, checkOut,\nreservationDetails, login系)]
+}
+
+package "ドメイン層" as Domain {
+  [データ構造\n(利用者, アカウント, ホテル, 部屋種別,\n部屋, 予約, 宿泊, 追加料金, 請求, 支払い)]
+  [状態遷移\n(RESERVATION_TRANSITIONS,\ntransitionReservation)]
+}
+
+package "データ層" as Data {
+  [loadState / saveState /\nnormalizeState]
+  [localStorage\n(キー: hrs-web-state-v2)]
+}
+
+UI --> App : ユースケース関数を呼び出す
+App --> Domain : 業務ルール・状態遷移を利用
+App --> Data : 保存・復元を依頼
+Data --> Domain : 状態を復元して供給
+
+note bottom of Domain
+  アプリケーション層・ドメイン層・
+  データ層は物理的には app.js の
+  同一ファイル内にある
+end note
+
+@enduml

@@ -4,37 +4,51 @@
 ' Issue: [Domain] オブジェクト図で検証する
 '
 ' 目的: 概念/設計クラス図に矛盾がないかを、具体的な値で確認する
-' スナップショット: 予約R-20260701-001 がチェックアウト完了した時点
-'   - 1泊（2026-07-10 → 2026-07-11）、一泊料金8000 → 合計8000
-'   - 合計金額は 予約.料金()（一泊料金 × 泊数）と一致する派生値
+' スナップショット: 予約 R-20260701-001 がチェックアウト完了した時点
+'   - 1泊（2026-07-10 → 2026-07-11）、一泊料金8000 → 基本料金8000
+'   - 追加料金なし → 合計金額 = 8000 = 支払い.金額
 '   - チェックアウト済みなので部屋301は AVAILABLE に戻っている
+' 旧版からの変更: 「顧客」→「利用者」に統一、ホテルID H01 → H001、
+'   請求・支払いのリンク先を宿泊から予約へ変更（実装準拠）
 ' ============================================================
 
-object "sato : 顧客" as sato {
-  顧客ID = "C001"
+object "sato : 利用者" as sato {
+  利用者ID = "C001"
   氏名 = "佐藤一郎"
   電話番号 = "090-1234-5678"
   メールアドレス = "sato@example.com"
 }
 
+object "satoAccount : アカウント" as satoAccount {
+  アカウントID = "U001"
+  メールアドレス = "sato@example.com"
+  パスワード = "user123"
+  登録日時 = 2026-07-01 09:00
+}
+
 object "hotel : ホテル" as hotel {
-  ホテルID = "H01"
+  ホテルID = "H001"
   ホテル名 = "Waseda Hotel"
+  地方 = "関東"
+  都道府県 = "東京都"
+  市区町村 = "新宿区"
 }
 
 object "single : 部屋種別" as single {
-  種別ID = "RT-S"
+  種別ID = "RT_SINGLE"
   種別名 = "Single"
   定員 = 1
   一泊料金 = 8000
 }
 
 object "room301 : 部屋" as room301 {
+  部屋ID = "RM301"
   部屋番号 = "301"
   状態 = AVAILABLE
 }
 
 object "room302 : 部屋" as room302 {
+  部屋ID = "RM302"
   部屋番号 = "302"
   状態 = AVAILABLE
 }
@@ -45,7 +59,11 @@ object "reservation001 : 予約" as reservation001 {
   チェックアウト日 = 2026-07-11
   人数 = 1
   状態 = CHECKED_OUT
+  基本料金 = 8000
+  支払済 = true
   予約日時 = 2026-07-01 10:00
+  チェックイン日時 = 2026-07-10 15:00
+  チェックアウト日時 = 2026-07-11 10:00
 }
 
 object "stay001 : 宿泊" as stay001 {
@@ -56,35 +74,41 @@ object "stay001 : 宿泊" as stay001 {
 
 object "invoice001 : 請求" as invoice001 {
   請求番号 = "INV-001"
+  基本料金 = 8000
+  追加料金合計 = 0
   合計金額 = 8000
   発行日時 = 2026-07-11 10:00
 }
 
 object "payment001 : 支払い" as payment001 {
   支払番号 = "PAY-001"
+  支払種別 = "CHECKOUT_TOTAL"
   金額 = 8000
   支払方法 = "現金"
   支払日時 = 2026-07-11 10:05
 }
 
 object "tanaka : フロントスタッフ" as tanaka {
-  スタッフID = "ST-01"
-  氏名 = "田中花子"
+  スタッフID = "h001-front"
 }
 
 ' ============================================================
 ' リンク（クラス図の各関連に対応）
 ' ============================================================
+sato           -- satoAccount    : 所有
 hotel          -- room301        : 所有
 hotel          -- room302        : 所有
+hotel          -- single         : 所有
 single         -- room301
 single         -- room302
 sato           -- reservation001
+reservation001 -- hotel
 reservation001 -- single         : 指定
 reservation001 -- room301        : 割当
 reservation001 -- stay001        : 発生
-stay001        -- invoice001     : 生成
-invoice001     -- payment001     : 対応
-tanaka         -- stay001        : 担当
+reservation001 -- invoice001     : 請求
+reservation001 -- payment001     : 支払い
+stay001        -- room301        : 使用
+tanaka         -- hotel          : 担当
 
 @enduml
