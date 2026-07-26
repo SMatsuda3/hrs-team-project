@@ -1,0 +1,68 @@
+@startuml
+
+top to bottom direction
+
+skinparam actorStyle stickman
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype polyline
+
+skinparam nodesep 40
+skinparam ranksep 35
+
+skinparam usecase {
+  BackgroundColor #FFFDC4
+  BorderColor Black
+  FontColor Black
+  FontStyle bold
+}
+
+skinparam actor {
+  BackgroundColor #FFFDC4
+  BorderColor Black
+  FontColor Black
+  FontStyle bold
+}
+
+actor "利用者" as User
+
+rectangle "ホテル予約システム" as HRS {
+
+  usecase "部屋を検索する" as UC_Search
+  usecase "部屋を予約する" as UC_Reserve
+  usecase "予約を確認する" as UC_Confirm
+  ' usecase "予約をキャンセルする" as UC_Cancel
+  usecase "チェックインする" as UC_CheckIn
+  usecase "チェックアウトする" as UC_CheckOut
+  usecase "ホテル情報を登録する" as UC_RegisterHotel
+
+  UC_Search -[hidden]down- UC_Reserve
+  UC_Reserve -[hidden]down- UC_Confirm
+  ' UC_Confirm -[hidden]down- UC_Cancel
+  ' UC_Cancel -[hidden]down- UC_CheckIn
+  UC_CheckIn -[hidden]down- UC_CheckOut
+  UC_CheckOut -[hidden]down- UC_RegisterHotel
+}
+
+actor "フロントスタッフ" as FrontStaff
+actor "予約システム管理者" as Admin
+
+User -- UC_Search
+User -- UC_Reserve
+User -- UC_Confirm
+' User -- UC_Cancel
+
+FrontStaff -- UC_CheckIn
+FrontStaff -- UC_CheckOut
+
+Admin -- UC_RegisterHotel
+
+' 左右位置の調整
+User -[hidden]right- UC_Confirm
+UC_CheckIn -[hidden]right- FrontStaff
+UC_RegisterHotel -[hidden]right- Admin
+
+' フロントスタッフを管理者より上に配置
+FrontStaff -[hidden]down- Admin
+
+@enduml
