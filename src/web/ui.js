@@ -243,6 +243,7 @@ function renderResults() {
 function renderReserve() {
   const query = state.lastSearch || defaultSearch();
   const type = state.roomTypes.find((item) => item.roomTypeId === query.roomTypeId);
+  const hotel = hotelById(query.hotelId);
   if (!type) {
     const root = page("予約情報の入力", "");
     root.appendChild(empty("空室検索結果から予約したい部屋を選択してください。"));
@@ -258,7 +259,8 @@ function renderReserve() {
           <p class="eyebrow">Your stay</p>
           <h2>${type.name}</h2>
           <div class="summary-list">
-            <div><span>ホテル</span><strong>${hotelById(query.hotelId).name}</strong></div>
+            <div><span>ホテル</span><strong>${escapeHtml(hotel.name)}</strong></div>
+            <div><span>住所</span><strong>${escapeHtml(hotel.address || hotelLocationText(query.hotelId))}</strong></div>
             <div><span>チェックイン</span><strong>${query.checkInDate}</strong></div>
             <div><span>チェックアウト</span><strong>${query.checkOutDate}</strong></div>
             <div><span>人数</span><strong>${query.guestCount}名</strong></div>
@@ -291,7 +293,8 @@ function renderReserve() {
         <p class="eyebrow">Your stay</p>
         <h2>${type.name}</h2>
         <div class="summary-list">
-          <div><span>ホテル</span><strong>${hotelById(query.hotelId).name}</strong></div>
+          <div><span>ホテル</span><strong>${escapeHtml(hotel.name)}</strong></div>
+          <div><span>住所</span><strong>${escapeHtml(hotel.address || hotelLocationText(query.hotelId))}</strong></div>
           <div><span>チェックイン</span><strong>${query.checkInDate}</strong></div>
           <div><span>チェックアウト</span><strong>${query.checkOutDate}</strong></div>
           <div><span>人数</span><strong>${query.guestCount}名</strong></div>
@@ -301,10 +304,10 @@ function renderReserve() {
       </aside>
       <form id="reserveForm" class="panel" style="grid-column: span 2;">
         <h2>予約者情報</h2>
-        <div class="summary-list">
-          <div><span>氏名</span><strong>${escapeHtml(account.name)}</strong></div>
-          <div><span>メール</span><strong>${escapeHtml(account.email)}</strong></div>
-          <div><span>電話番号</span><strong>${escapeHtml(account.phone)}</strong></div>
+        <div class="form-grid">
+          <label>氏名<input name="name" autocomplete="name" required value="${escapeHtml(account.name)}"></label>
+          <label>メールアドレス<input name="email" type="email" autocomplete="email" required value="${escapeHtml(account.email)}"></label>
+          <label>電話番号<input name="phone" autocomplete="tel" required value="${escapeHtml(account.phone)}"></label>
         </div>
         <div class="actions" style="margin-top:16px;">
           <button type="button" class="button secondary" data-view="results">条件に戻る</button>
@@ -318,7 +321,7 @@ function renderReserve() {
   root.querySelector("#reserveForm").addEventListener("submit", (event) => {
     event.preventDefault();
     try {
-      const reservation = reserveRoom();
+      const reservation = reserveRoom(Object.fromEntries(new FormData(event.currentTarget)));
       state.lastReservationId = reservation.reservationId;
       saveState();
       render("complete");
@@ -344,9 +347,11 @@ function renderComplete() {
         <p class="eyebrow">Reservation confirmed</p>
         <h2 class="reservation-number">予約番号 ${detail.reservation.reservationId}</h2>
         <div class="summary-list">
-          <div><span>代表者</span><strong>${detail.customer.name}</strong></div>
+          <div><span>代表者</span><strong>${escapeHtml(detail.customer.name)}</strong></div>
+          <div><span>ホテル</span><strong>${escapeHtml(detail.hotel.name)}</strong></div>
+          <div><span>住所</span><strong>${escapeHtml(detail.hotel.address || hotelLocationText(detail.hotel.hotelId))}</strong></div>
           <div><span>宿泊期間</span><strong>${detail.reservation.checkInDate} - ${detail.reservation.checkOutDate}</strong></div>
-          <div><span>部屋タイプ</span><strong>${detail.roomType.name}</strong></div>
+          <div><span>部屋タイプ</span><strong>${escapeHtml(detail.roomType.name)}</strong></div>
           <div><span>料金目安</span><strong>${yen(detail.reservation.baseAmount)}</strong></div>
           <div><span>状態</span><strong>${detail.reservation.status}</strong></div>
         </div>
@@ -552,15 +557,20 @@ function renderCustomerReservations() {
   if (!details.length) {
     section.appendChild(empty("このアカウントの予約はまだありません。"));
   } else {
-    section.innerHTML = `
-      <div class="results">
-        ${details.map((detail) => reservationCard(detail, true)).join("")}
-      </div>
-    `;
+    section.innerHTML = reservationListMarkup(details, true, state.showPastReservations, "showPastReservations");
   }
   root.appendChild(section);
+  const showPastToggle = root.querySelector("#showPastReservations");
+  showPastToggle?.addEventListener("change", (event) => {
+    state.showPastReservations = event.currentTarget.checked;
+    saveState();
+    render("lookup");
+  });
   root.querySelectorAll("[data-cancel]").forEach((cancelButton) => {
     cancelButton.addEventListener("click", () => {
+      if (!confirmReservationCancellation()) {
+        return;
+      }
       try {
         cancelReservation(cancelButton.dataset.cancel);
         saveState();
@@ -595,14 +605,19 @@ function lookupPanel(allowCancel) {
     const details = portal === "staff" ? staffReservationDetailsList(keyword) : reservationDetailsList(keyword);
     section.querySelector("#lookupResult").innerHTML = `
       <section class="section">
-        <div class="section-header"><div><h2>予約一覧</h2></div></div>
-        <div class="results">
-          ${details.map((detail) => reservationCard(detail, allowCancel)).join("")}
-        </div>
+        ${reservationListMarkup(details, allowCancel, state.showPastLookupReservations, "showPastLookupReservations")}
       </section>
     `;
+    section.querySelector("#showPastLookupReservations")?.addEventListener("change", (event) => {
+      state.showPastLookupReservations = event.currentTarget.checked;
+      saveState();
+      refreshResults(keyword);
+    });
     section.querySelectorAll("[data-cancel]").forEach((cancelButton) => {
       cancelButton.addEventListener("click", () => {
+        if (!confirmReservationCancellation()) {
+          return;
+        }
         try {
           cancelReservation(cancelButton.dataset.cancel);
           saveState();
@@ -741,55 +756,128 @@ function renderCheckOut() {
   const root = workspacePage("チェックアウト", "", staffMenu());
   const panel = el("section", "panel");
   panel.innerHTML = `
+    <div id="checkoutStepper" class="stepper">
+      <span class="step active">1 予約確認</span>
+      <span class="step">2 合計金額</span>
+      <span class="step">3 支払い完了</span>
+      <span class="step">4 チェックアウト</span>
+    </div>
     <form id="checkOutForm">
       <div class="form-grid">
         <label>予約番号または部屋番号<input name="reservationKey" required placeholder="R-XXXXXXXX または 301"></label>
-        <label>支払い方法<select name="method"><option>cash</option><option>credit card</option><option>electronic money</option></select></label>
+        <label>支払い方法<select name="method"><option>現金</option><option>クレジットカード</option><option>電子マネー</option></select></label>
       </div>
       <p class="muted">予約時に提示した基本料金と追加料金を、チェックアウト時にまとめて精算します。</p>
       <h3>追加料金</h3>
       <div id="charges" class="form-grid one"></div>
       <div class="actions" style="margin-top:12px;">
         <button type="button" class="button secondary" id="addCharge">追加料金を追加</button>
-        <button class="button primary">会計を精算してチェックアウト</button>
+        <button class="button primary">会計を精算する</button>
       </div>
     </form>
     <div id="checkOutResult"></div>
   `;
   const charges = panel.querySelector("#charges");
+  const resultNode = panel.querySelector("#checkOutResult");
+  let settlement = null;
+  const updateStepper = (stage) => {
+    panel.querySelectorAll("#checkoutStepper .step").forEach((step, index) => {
+      const stepNumber = index + 1;
+      step.classList.toggle("done", stepNumber < stage);
+      step.classList.toggle("active", stepNumber === stage);
+    });
+  };
+  const clearSettlement = () => {
+    settlement = null;
+    resultNode.innerHTML = "";
+    updateStepper(1);
+  };
   const addChargeRow = () => {
     const row = el("div", "form-grid");
     row.innerHTML = `
-      <label>項目<input name="chargeName" placeholder="breakfast"></label>
+      <label>項目<input name="chargeName" placeholder="朝食"></label>
       <label>金額<input name="chargeAmount" type="number" min="0" value="0"></label>
     `;
     charges.appendChild(row);
   };
   addChargeRow();
-  panel.querySelector("#addCharge").addEventListener("click", addChargeRow);
+  panel.querySelector("#addCharge").addEventListener("click", () => {
+    addChargeRow();
+    clearSettlement();
+  });
+  panel.querySelector("#checkOutForm").addEventListener("input", clearSettlement);
+  const readCheckOutInput = (formElement) => {
+    const form = new FormData(formElement);
+    const names = form.getAll("chargeName");
+    const amounts = form.getAll("chargeAmount");
+    return {
+      reservationKey: normalizeReservationInput(form.get("reservationKey")),
+      method: form.get("method"),
+      charges: names.map((name, index) => ({ name, amount: Number(amounts[index]) }))
+        .filter((charge) => charge.name && charge.amount > 0)
+    };
+  };
+  const renderPaymentConfirmation = (paymentDone = false) => {
+    const quote = settlement.quote;
+    updateStepper(paymentDone ? 3 : 2);
+    resultNode.innerHTML = `
+      <article class="reservation-card">
+        <h3>${paymentDone ? "支払い完了" : "合計金額"}</h3>
+        <div class="summary-list">
+          <div><span>予約番号</span><strong>${quote.detail.reservation.reservationId}</strong></div>
+          <div><span>顧客名</span><strong>${escapeHtml(quote.detail.customer.name)}</strong></div>
+          <div><span>ホテル</span><strong>${escapeHtml(quote.detail.hotel.name)}</strong></div>
+          <div><span>部屋番号</span><strong>${escapeHtml(quote.detail.room?.roomNumber || "未割当")}</strong></div>
+          <div><span>基本料金</span><strong>${yen(quote.baseAmount)}</strong></div>
+          <div><span>追加料金</span><strong>${yen(quote.extraAmount)}</strong></div>
+          <div><span>合計金額</span><strong class="price">${yen(quote.totalAmount)}</strong></div>
+          <div><span>支払い方法</span><strong>${escapeHtml(settlement.method)}</strong></div>
+        </div>
+        <div class="actions" style="margin-top:16px;">
+          ${paymentDone
+            ? `<button class="button primary" id="finalCheckOut">チェックアウトする</button>`
+            : `<button class="button primary" id="completePayment">支払いを完了する</button>
+               <button class="button ghost" id="editSettlement">内容を修正する</button>`}
+        </div>
+      </article>
+    `;
+    resultNode.querySelector("#completePayment")?.addEventListener("click", () => {
+      renderPaymentConfirmation(true);
+      toast("支払い完了を確認しました。");
+    });
+    resultNode.querySelector("#editSettlement")?.addEventListener("click", clearSettlement);
+    resultNode.querySelector("#finalCheckOut")?.addEventListener("click", () => {
+      try {
+        const invoice = checkOut(settlement.reservationKey, settlement.charges, settlement.method);
+        saveState();
+        updateStepper(4);
+        resultNode.innerHTML = `
+          <article class="reservation-card">
+            <h3>チェックアウト完了</h3>
+            <div class="summary-list">
+              <div><span>請求番号</span><strong>${invoice.invoiceId}</strong></div>
+              <div><span>基本料金</span><strong>${yen(invoice.baseAmount)}</strong></div>
+              <div><span>追加支払い額</span><strong>${yen(invoice.extraAmount)}</strong></div>
+              <div><span>合計支払い額</span><strong>${yen(invoice.totalAmount)}</strong></div>
+              <div><span>支払い方法</span><strong>${escapeHtml(settlement.method)}</strong></div>
+            </div>
+          </article>
+        `;
+        toast("チェックアウトを完了しました。");
+      } catch (error) {
+        toast(error.message);
+      }
+    });
+  };
   panel.querySelector("#checkOutForm").addEventListener("submit", (event) => {
     event.preventDefault();
     try {
-      const form = new FormData(event.currentTarget);
-      const names = form.getAll("chargeName");
-      const amounts = form.getAll("chargeAmount");
-      const chargeInputs = names.map((name, index) => ({ name, amount: Number(amounts[index]) }))
-        .filter((charge) => charge.name && charge.amount > 0);
-      const invoice = checkOut(normalizeReservationInput(form.get("reservationKey")), chargeInputs, form.get("method"));
-      saveState();
-      panel.querySelector("#checkOutResult").innerHTML = `
-        <article class="reservation-card">
-          <h3>チェックアウト完了</h3>
-          <div class="summary-list">
-            <div><span>請求番号</span><strong>${invoice.invoiceId}</strong></div>
-            <div><span>基本料金</span><strong>${yen(invoice.baseAmount)}</strong></div>
-            <div><span>追加支払い額</span><strong>${yen(invoice.extraAmount)}</strong></div>
-            <div><span>合計支払い額</span><strong>${yen(invoice.totalAmount)}</strong></div>
-            <div><span>支払い方法</span><strong>${form.get("method")}</strong></div>
-          </div>
-        </article>
-      `;
-      toast("チェックアウトを完了しました。");
+      const input = readCheckOutInput(event.currentTarget);
+      settlement = {
+        ...input,
+        quote: checkOutQuote(input.reservationKey, input.charges)
+      };
+      renderPaymentConfirmation(false);
     } catch (error) {
       toast(error.message);
     }
@@ -1029,6 +1117,40 @@ function pageHeader(title, subtitle) {
   return header;
 }
 
+function reservationListMarkup(details, allowCancel, showPast, checkboxId) {
+  const activeDetails = details.filter((detail) => !isEndedReservation(detail.reservation));
+  const pastDetails = details.filter((detail) => isEndedReservation(detail.reservation));
+  return `
+    ${pastDetails.length ? `
+      <div class="reservation-filter-bar">
+        <label class="checkbox-line">
+          <input id="${checkboxId}" type="checkbox" ${showPast ? "checked" : ""}>
+          <span>過去の予約を表示</span>
+        </label>
+      </div>
+    ` : ""}
+    ${activeDetails.length
+      ? reservationGroupBlock("現在の予約", activeDetails, allowCancel)
+      : `<div class="empty">現在の予約はありません。</div>`}
+    ${showPast && pastDetails.length ? reservationGroupBlock("過去の予約", pastDetails, allowCancel) : ""}
+  `;
+}
+
+function reservationGroupBlock(title, details, allowCancel) {
+  return `
+    <div class="reservation-group">
+      <div class="section-header compact"><div><h2>${title}</h2></div></div>
+      <div class="results">
+        ${details.map((detail) => reservationCard(detail, allowCancel)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function confirmReservationCancellation() {
+  return window.confirm("本当に予約をキャンセルしますか？\nキャンセル後は元に戻せません。");
+}
+
 function reservationCard(detail, allowCancel) {
   const cancelAction = allowCancel && detail.reservation.status === "RESERVED"
     ? `<button class="button danger" data-cancel="${detail.reservation.reservationId}">キャンセル実行</button>`
@@ -1043,11 +1165,12 @@ function reservationCard(detail, allowCancel) {
         <span class="status">${detail.reservation.status}</span>
       </div>
       <div class="summary-list">
-        <div><span>顧客名</span><strong>${detail.customer.name}</strong></div>
-        <div><span>メール</span><strong>${detail.customer.email}</strong></div>
-        <div><span>ホテル</span><strong>${detail.hotel.name}</strong></div>
-        <div><span>部屋タイプ</span><strong>${detail.roomType.name}</strong></div>
-        <div><span>部屋番号</span><strong>${detail.room?.roomNumber || "未割当"}</strong></div>
+        <div><span>顧客名</span><strong>${escapeHtml(detail.customer.name)}</strong></div>
+        <div><span>メール</span><strong>${escapeHtml(detail.customer.email)}</strong></div>
+        <div><span>ホテル</span><strong>${escapeHtml(detail.hotel.name)}</strong></div>
+        <div><span>住所</span><strong>${escapeHtml(detail.hotel.address || hotelLocationText(detail.hotel.hotelId))}</strong></div>
+        <div><span>部屋タイプ</span><strong>${escapeHtml(detail.roomType.name)}</strong></div>
+        <div><span>部屋番号</span><strong>${escapeHtml(detail.room?.roomNumber || "未割当")}</strong></div>
         <div><span>宿泊期間</span><strong>${detail.reservation.checkInDate} - ${detail.reservation.checkOutDate}</strong></div>
         <div><span>人数</span><strong>${detail.reservation.guestCount}名</strong></div>
         <div><span>基本料金</span><strong>${yen(detail.reservation.baseAmount)}</strong></div>

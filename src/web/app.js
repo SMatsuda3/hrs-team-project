@@ -215,7 +215,7 @@ function searchAvailability(query) {
     .filter((result) => result.availableRooms > 0);
 }
 
-function reserveRoom(customerInput) {
+function reserveRoom(customerInput = {}) {
   const query = state.lastSearch;
   if (!query) {
     throw new Error("空室検索から予約を開始してください。");
@@ -227,9 +227,10 @@ function reserveRoom(customerInput) {
     throw new Error("指定条件で予約できる空室がありません。");
   }
   const roomType = state.roomTypes.find((type) => type.roomTypeId === query.roomTypeId);
-  const customer = syncCustomerFromAccount(account);
+  const customer = bookingCustomerFromInput(account, customerInput);
   const reservation = {
     reservationId: id("R"),
+    accountId: account.accountId,
     customerId: customer.customerId,
     hotelId: query.hotelId,
     roomTypeId: query.roomTypeId,
@@ -296,21 +297,26 @@ function checkIn(reservationId) {
   return reservationDetails(reservationId);
 }
 
-function checkOut(reservationKey, charges, method) {
-  let reservation = state.reservations.find((item) => item.reservationId === reservationKey);
-  if (!reservation) {
-    const room = state.rooms.find((item) =>
-      item.roomNumber === reservationKey &&
-      (!currentStaffHotelId() || item.hotelId === currentStaffHotelId()));
-    reservation = state.reservations.find((item) => item.assignedRoomId === room?.roomId && item.status === "CHECKED_IN");
-  }
-  if (!reservation) {
-    throw new Error("予約番号または部屋番号が見つかりません。");
-  }
+function checkOutQuote(reservationKey, charges = []) {
+  const reservation = findCheckOutReservation(reservationKey);
   assertStaffCanAccessReservation(reservation);
   assertReservationTransition(reservation, "checkOut");
-  const extraAmount = charges.reduce((sum, charge) => sum + charge.amount, 0);
-  charges.forEach((charge) => state.extraCharges.push({
+  const normalizedCharges = normalizeCharges(charges);
+  const extraAmount = normalizedCharges.reduce((sum, charge) => sum + charge.amount, 0);
+  return {
+    detail: reservationDetails(reservation.reservationId),
+    reservation,
+    charges: normalizedCharges,
+    baseAmount: reservation.baseAmount,
+    extraAmount,
+    totalAmount: reservation.baseAmount + extraAmount
+  };
+}
+
+function checkOut(reservationKey, charges, method) {
+  const quote = checkOutQuote(reservationKey, charges);
+  const reservation = quote.reservation;
+  quote.charges.forEach((charge) => state.extraCharges.push({
     chargeId: id("E"),
     reservationId: reservation.reservationId,
     name: charge.name,
@@ -319,9 +325,9 @@ function checkOut(reservationKey, charges, method) {
   const invoice = {
     invoiceId: id("I"),
     reservationId: reservation.reservationId,
-    baseAmount: reservation.baseAmount,
-    extraAmount,
-    totalAmount: reservation.baseAmount + extraAmount,
+    baseAmount: quote.baseAmount,
+    extraAmount: quote.extraAmount,
+    totalAmount: quote.totalAmount,
     issuedAt: new Date().toISOString()
   };
   state.invoices.push(invoice);
@@ -390,7 +396,9 @@ function staffReservations() {
 function reservationDetailsForSignedInUser() {
   const account = requireCustomerAccount();
   return state.reservations
-    .filter((reservation) => reservation.customerId === account.customerId)
+    .filter((reservation) => reservation.accountId
+      ? reservation.accountId === account.accountId
+      : reservation.customerId === account.customerId)
     .slice()
     .sort((a, b) => new Date(b.createdAt || b.reservedAt || 0) - new Date(a.createdAt || a.reservedAt || 0))
     .map((reservation) => reservationDetails(reservation.reservationId));
@@ -412,8 +420,9 @@ function nightsBetween(checkInDate, checkOutDate) {
 
 function defaultSearch() {
   const today = new Date();
-  const checkIn = new Date(today.getTime() + 86400000);
-  const checkOut = new Date(today.getTime() + 86400000 * 2);
+  const checkIn = new Date(today);
+  const checkOut = new Date(today);
+  checkOut.setDate(checkOut.getDate() + 1);
   return {
     hotelId: "",
     region: "",
@@ -425,6 +434,24 @@ function defaultSearch() {
     roomTypeName: "",
     roomTypeId: ""
   };
+}
+
+function normalizeSearch(search) {
+  if (!search) {
+    return null;
+  }
+  const normalized = { ...defaultSearch(), ...search };
+  try {
+    validateDates(normalized.checkInDate, normalized.checkOutDate);
+  } catch {
+    return null;
+  }
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (new Date(normalized.checkInDate) < todayStart) {
+    return null;
+  }
+  return normalized;
 }
 
 function defaultHotel() {
@@ -552,6 +579,43 @@ function syncCustomerFromAccount(account) {
   return customer;
 }
 
+function bookingCustomerFromInput(account, input = {}) {
+  const customerInput = {
+    name: String(input.name || account.name || "").trim(),
+    email: normalizeLoginId(input.email || account.email || ""),
+    phone: String(input.phone || account.phone || "").trim()
+  };
+  if (!customerInput.name || !customerInput.email || !customerInput.phone) {
+    throw new Error("予約者の氏名、メールアドレス、電話番号を入力してください。");
+  }
+  if (!customerInput.email.includes("@")) {
+    throw new Error("予約者メールアドレスの形式を確認してください。");
+  }
+
+  const accountCustomer = syncCustomerFromAccount(account);
+  const sameAsAccount =
+    customerInput.name === accountCustomer.name &&
+    customerInput.email === accountCustomer.email &&
+    normalizeReservationInput(customerInput.phone) === normalizeReservationInput(accountCustomer.phone);
+  if (sameAsAccount) {
+    return accountCustomer;
+  }
+
+  let customer = state.customers.find((item) =>
+    item.name === customerInput.name &&
+    normalizeLoginId(item.email) === customerInput.email &&
+    normalizeReservationInput(item.phone) === normalizeReservationInput(customerInput.phone));
+  if (!customer) {
+    customer = { customerId: id("C"), ...customerInput };
+    state.customers.push(customer);
+  } else {
+    customer.name = customerInput.name;
+    customer.email = customerInput.email;
+    customer.phone = customerInput.phone;
+  }
+  return customer;
+}
+
 function signIn(role, signedInUserId, signedInHotelId = "") {
   state.role = role;
   state.signedInUserId = signedInUserId;
@@ -628,6 +692,10 @@ function transitionReservation(reservation, action) {
   return reservation;
 }
 
+function isEndedReservation(reservation) {
+  return ["CANCELLED", "CHECKED_OUT"].includes(reservation.status);
+}
+
 function roomDescription(roomTypeName) {
   return {
     Single: "一人旅や出張に向いた静かな標準ルームです。",
@@ -666,6 +734,29 @@ function totalAvailableRooms(hotelId, checkInDate, checkOutDate) {
     .reduce((sum, type) => sum + availableRoomCount(type.hotelId, type.roomTypeId, range.checkInDate, range.checkOutDate), 0);
 }
 
+function findCheckOutReservation(reservationKey) {
+  let reservation = state.reservations.find((item) => item.reservationId === reservationKey);
+  if (!reservation) {
+    const room = state.rooms.find((item) =>
+      item.roomNumber === reservationKey &&
+      (!currentStaffHotelId() || item.hotelId === currentStaffHotelId()));
+    reservation = state.reservations.find((item) => item.assignedRoomId === room?.roomId && item.status === "CHECKED_IN");
+  }
+  if (!reservation) {
+    throw new Error("予約番号または部屋番号が見つかりません。");
+  }
+  return reservation;
+}
+
+function normalizeCharges(charges = []) {
+  return charges
+    .map((charge) => ({
+      name: String(charge.name || "").trim(),
+      amount: Number(charge.amount || 0)
+    }))
+    .filter((charge) => charge.name && charge.amount > 0);
+}
+
 function defaultInventoryRange() {
   const today = new Date();
   const tomorrow = new Date(today.getTime() + 86400000);
@@ -702,7 +793,10 @@ function id(prefix) {
 }
 
 function isoDate(date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function saveState() {
@@ -726,6 +820,9 @@ function normalizeState(rawState) {
   const normalized = { ...structuredClone(seedState), ...rawState };
   normalized.signedInHotelId = normalized.signedInHotelId || "";
   normalized.resultSort = normalized.resultSort || "priceAsc";
+  normalized.showPastReservations = Boolean(normalized.showPastReservations);
+  normalized.showPastLookupReservations = Boolean(normalized.showPastLookupReservations);
+  normalized.lastSearch = normalizeSearch(normalized.lastSearch);
   normalized.accounts = mergeSeedItems(seedState.accounts, normalized.accounts || [], "accountId").map((account) => ({
     accountId: account.accountId || idFromSeed("U"),
     customerId: account.customerId || idFromSeed("C"),
@@ -750,6 +847,7 @@ function normalizeState(rawState) {
   normalized.rooms = mergeSeedItems(seedState.rooms, normalized.rooms || [], "roomId");
   delete normalized.roomTypeInventories;
   normalized.reservations = normalized.reservations.map((reservation) => ({
+    accountId: reservation.accountId || normalized.accounts.find((account) => account.customerId === reservation.customerId)?.accountId || "",
     reservedAt: reservation.createdAt || "",
     cancelledAt: "",
     checkedInAt: "",
